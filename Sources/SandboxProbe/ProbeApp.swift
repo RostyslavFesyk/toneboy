@@ -15,6 +15,12 @@ final class ProbeModel: ObservableObject {
     @Published private(set) var captureActive = false
     @Published private(set) var bassCut = false
     private let engine = SystemAudioEngine()
+    private let selfTestPlayer = SelfTestPlayer()
+    private var challenge = SelfTestSignal()
+    private var challengeStarted: Date?
+    private var verificationSamples: [Float] = []
+    private var verified = false
+    private var verificationFailed = false
     private var timer: Timer?
     private var lastSignal = Date.distantPast
     private var started = Date()
@@ -43,16 +49,19 @@ final class ProbeModel: ObservableObject {
         for observation in observations { NSWorkspace.shared.notificationCenter.removeObserver(observation) }
     }
     func start() {
+        selfTestPlayer.stop()
+        challenge = SelfTestSignal(); challengeStarted = nil
+        verificationSamples = []; verified = false; verificationFailed = false
         engine.stop()
         processing = false; canProcess = false; captureActive = false
         inputPeak = 0; callbacks = 0; lastSignal = .distantPast
         phase = "Starting capture"
         do {
-            try engine.start()
+            try engine.start(includeOwnAudio: true)
             started = Date(); lastCallback = started
             captureActive = true
-            phase = "Waiting for audio"
-            detail = "Allow the macOS request, then play audio from another app. Original playback stays on. Silence is not proof of denied permission."
+            phase = "Checking audio access"
+            detail = "Allow the macOS request. toneboy will play a short, quiet verification sound automatically."
         } catch {
             phase = "Capture failed"
             detail = error.localizedDescription
@@ -60,7 +69,7 @@ final class ProbeModel: ObservableObject {
         writeReport()
     }
     func enableEQ() {
-        guard captureActive, canProcess, Date().timeIntervalSince(lastSignal) < 1 else { return }
+        guard captureActive, verified else { return }
         do {
             try engine.enableProcessing()
             processing = true; phase = "Processing"
@@ -78,7 +87,9 @@ final class ProbeModel: ObservableObject {
         writeReport()
     }
     func stop(_ reason: String = "Original playback restored.") {
+        selfTestPlayer.stop()
         engine.stop()
+        verified = false; challengeStarted = nil
         captureActive = false; processing = false; canProcess = false; bassCut = false
         inputPeak = 0; phase = "Stopped"; detail = reason
         writeReport()
@@ -99,13 +110,42 @@ final class ProbeModel: ObservableObject {
         callbacks = count
         inputPeak = tb_input_peak(dsp)
         if inputPeak > 0.00001 { lastSignal = Date() }
-        canProcess = Date().timeIntervalSince(lastSignal) < 1
-        if !processing, canProcess {
-            phase = "Capture verified"
-            detail = "Nonzero input samples received through the sandboxed tap. You can now test the EQ route."
-        } else if !processing {
-            phase = "Waiting for audio"
-            detail = "No recent signal. Play audio; if access was denied, enable it in System Settings and retry."
+        if !verified && !verificationFailed {
+            if challengeStarted == nil, NSApp.isActive, Date().timeIntervalSince(started) > 0.5 {
+                // Discard earlier audio: only the fresh randomized challenge can verify capture.
+                var discarded = [Float](repeating: 0, count: 32768)
+                _ = tb_read_analysis(dsp, &discarded, UInt32(discarded.count))
+                do {
+                    try selfTestPlayer.play(challenge, rate: engine.sampleRate)
+                    challengeStarted = Date()
+                } catch {
+                    stop("Could not play the verification sound. Check the output device and retry.")
+                    return
+                }
+            }
+            if let challengeStarted {
+                var fresh = [Float](repeating: 0, count: 8192)
+                let count = tb_read_analysis(dsp, &fresh, UInt32(fresh.count))
+                verificationSamples.append(contentsOf: fresh.prefix(Int(count)))
+                if verificationSamples.count > 8192 { verificationSamples.removeFirst(verificationSamples.count - 8192) }
+                if challenge.matches(verificationSamples, rate: engine.sampleRate) {
+                    selfTestPlayer.stop()
+                    verified = true; canProcess = true
+                    phase = "Audio access verified"
+                    detail = "The app captured its own verification sound through the system tap. Starting EQ automatically."
+                    enableEQ()
+                    return
+                }
+                if Date().timeIntervalSince(challengeStarted) > 2 {
+                    selfTestPlayer.stop()
+                    verificationFailed = true
+                    engine.stop(); captureActive = false; canProcess = false
+                    phase = "Audio access could not be verified"
+                    detail = "Enable system audio access in Settings, then retry. A muted or unsupported output can also prevent verification."
+                    writeReport()
+                    return
+                }
+            }
         }
         if engine.routeChanged() {
             stop("Output changed. Restart capture to verify the new route.")
@@ -115,19 +155,15 @@ final class ProbeModel: ObservableObject {
             stop("No callbacks for five seconds. The route was stopped; retry capture or check access.")
             return
         }
-        // A probe cannot distinguish silence from revoked access with the public tap API.
-        // Prefer restoring the original route instead of leaving a possibly muted Mac.
-        if processing, Date().timeIntervalSince(lastSignal) > 3 {
-            stop("No signal for three seconds. Original playback restored as a probe safety measure.")
-            return
-        }
+        // After the challenge succeeds, ordinary silence must not stop the EQ.
+        // Revocation handling after activation remains a separate experiment.
         ticks += 1
         if ticks % 10 == 0 { writeReport() }
     }
     private func writeReport() {
         let report: [String: Any] = [
             "phase": phase, "detail": detail, "callbacks": callbacks,
-            "inputPeak": inputPeak, "processing": processing, "bassCut": bassCut,
+            "inputPeak": inputPeak, "processing": processing, "bassCut": bassCut, "selfTestVerified": verified,
             "output": engine.outputName, "sampleRate": engine.sampleRate,
             "bundleID": Bundle.main.bundleIdentifier ?? "unbundled",
             "containerHome": NSHomeDirectory(), "pid": ProcessInfo.processInfo.processIdentifier,
@@ -160,7 +196,7 @@ struct ProbeView: View {
                 Button("Open System Settings") { model.openSettings() }
                 Button("Quit") { NSApplication.shared.terminate(nil) }
             }
-            Text("This is a feasibility test, not the final permission UX. No sound means unknown permission, not denied permission. The probe stops processing after 3 seconds of silence.")
+            Text("One app, no driver: a short quiet sound verifies capture. After success EQ starts automatically, including during silence. This remains an experimental permission flow.")
                 .font(.caption).foregroundStyle(.secondary)
         }.padding(24).frame(width: 650)
     }

@@ -16,17 +16,30 @@ open '../toneboy Sandbox Probe.app' --args --start-capture
 
 The build is ad-hoc signed by default. Set `TONEBOY_SIGN_IDENTITY` for a suitable local signing identity. This is not an App Store-signed or notarized release.
 
-## Startup and permission semantics
+## Current experiment: in-app verification sound
 
-Starting the tap/aggregate triggers macOS's own system audio permission request. There is no permission preflight in this probe.
+The probe now verifies capture automatically using a quiet, 0.7-second two-tone challenge generated in memory with AVAudioEngine. The two frequencies are randomized per attempt. No driver, helper installation, audio file, or ScreenCaptureKit permission is needed.
 
-The tap starts **unmuted**, with rendering disabled in the DSP callback. This prevents silence or doubled playback while checking capture. Callback success alone is never treated as permission approval. Real nonzero input enables the manual EQ test button, which changes the tap's mute behavior and enables the processed output.
+Initially the global tap includes the app itself, stays unmuted, and has its processed output disabled. The detector requires both challenge frequencies to dominate captured audio; arbitrary nonzero samples are not enough. If matched, playback of the test signal stops, the tap excludes the app's own process, and EQ routing starts automatically. Ordinary silence no longer disables processing.
 
-No input is deliberately reported as unknown: it can mean silence, access denial, a protected source, or an unsupported route. The probe cannot automatically identify which. It never stores a fabricated permission grant.
+If verification fails, the route is destroyed and the UI offers Settings and retry. Failure is **not** labeled as definitive permission denial: muted output, competing audio, or an unsupported route may also prevent the challenge being recognized. Verification does not persist a claimed permission grant across launches.
 
-For this experiment, processing is stopped after three seconds without input, after five seconds without callbacks, on route changes, and on sleep. These are diagnostic safety rules, **not a shippable final UX**: valid silence would also stop EQ. Opening Settings and returning restarts capture, but if macOS terminates the process during a permission change, the app has to be reopened.
+This remains a feasibility implementation. Runtime revocation while already processing, first-ever consent that takes a long time, silent/muted output, simultaneous music, Bluetooth route latency, and automatic restart after macOS terminates the app still require validation before replacing the production permission flow.
 
-## Local observations — 2026-11-08
+Starting the tap triggers macOS's own consent request; no private permission preflight is used. Returning from Settings retries capture if the process survived. Route changes, sleep, and missing callbacks stop the experimental route. This is not a complete production reconnect policy.
+
+## In-app self-test observations — 2026-11-08
+
+- With audio access already granted, the app played its own challenge, detected it through the system tap, and automatically entered processing. No external player or music was needed.
+- The user then revoked **only the probe's** system audio permission in Settings. After relaunch, the same self-test received zero captured input, failed verification, destroyed the route, and left EQ activation disabled.
+- The own-process signal did not bypass the revoked system-audio permission in this tested global-tap configuration.
+- 30 local tests passed: the original 26 plus four tests for challenge recognition across sample rates/volumes, rejection of silence/invalid samples, rejection of other frequencies, and signal duration/amplitude/fades.
+- Static audit still passed: App Sandbox and Audio Input entitlements, separate bundle identity, and no private TCC markers in the probe binary.
+- A first-ever denial from the consent dialog and consent-recovery in the new automatic flow are not yet tested. The earlier manual probe verified regrant after relaunch, as recorded below.
+
+The tone is deliberately quiet but can be audible. This experiment does not claim a silent or interruption-free verification mechanism.
+
+## Earlier manual-probe observations — 2026-11-08
 
 Environment: macOS 26.2, Apple Silicon, built-in stereo speakers at 48 kHz. No microphone stream was intentionally enabled; physical input streams are disabled before capture starts.
 
@@ -52,7 +65,7 @@ Core Audio process-tap capture and the tested EQ routing operations can run insi
 
 Before an App Store edition:
 
-1. Decide how to handle unknown permission during silence without false active states or a muted Mac. Investigate a public permission flow with a reliable result; do not silently substitute screen/microphone permission for system-audio permission.
+1. Validate the in-app challenge flow across muted outputs, concurrent audio, delayed first consent, runtime permission revocation, and Bluetooth latency. A functional self-test verifies the route, not an official permission status.
 2. Validate the same route and failure recovery across supported macOS versions and physical outputs.
 3. Configure appropriate signing, provisioning, entitlements, and App Store packaging.
 4. Resolve distribution rights for all included code and contributions. This repository is GPL-3.0-only; no extra licensing rights are implied by this experiment.
@@ -66,3 +79,10 @@ Before an App Store edition:
 - The installed macOS SDK documents `kAudioTapPropertyDescription` as supporting changes to an existing tap description.
 
 The app writes a local `report.json` under its sandbox Application Support directory. It contains counters, current input peak, phase, device name, and process metadata, but no audio samples. Do not publish raw reports without reviewing local paths and device names.
+
+## Related implementations researched
+
+- [SoundDial setup](https://sounddial.eu/uses/setup-and-permission-mac-audio): documents an audio permission flow, real functionality checks, and a quiet test sound; its precise implementation is not public. The toneboy experiment is independently implemented.
+- [CoreEQ permission adapter](https://github.com/AndreyPudov/core-eq/blob/main/CoreEQ/Audio/Capture/AudioCapturePermission.swift): uses private TCC entry points, so it is not a public-API permission example for this experiment.
+- [eqMac architecture](https://github.com/bitgapp/eqMac#technology): describes an audio-driver path.
+- [OBS ScreenCaptureKit audio capture](https://github.com/obsproject/obs-studio/blob/master/plugins/mac-capture/mac-sck-audio-capture.m): useful for recording, but capture alone does not replace the EQ routing/muting path.

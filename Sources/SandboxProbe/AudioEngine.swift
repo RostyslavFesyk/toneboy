@@ -58,6 +58,7 @@ protocol AudioEngineControlling: AnyObject {
 
 final class SystemAudioEngine: AudioEngineControlling {
     private(set) var dsp: OpaquePointer?
+    private var ownProcessID = AudioObjectID(0)
     private var tapDescription: CATapDescription?
     private var tapID: AudioObjectID = 0
     private var aggregateID: AudioObjectID = 0
@@ -68,7 +69,9 @@ final class SystemAudioEngine: AudioEngineControlling {
 
     deinit { stop() }
 
-    func start() throws {
+    func start() throws { try start(includeOwnAudio: false) }
+
+    func start(includeOwnAudio: Bool) throws {
         stop()
         do {
             outputID = try AudioProperty.defaultOutput()
@@ -88,7 +91,8 @@ final class SystemAudioEngine: AudioEngineControlling {
                 UInt32(MemoryLayout<pid_t>.size), &pid, &size, &ownProcess), "Could not exclude the app’s own audio")
             guard ownProcess != 0 else { throw AudioFailure(message: "Core Audio is not ready. Try turning the equalizer on again.") }
 
-            let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [ownProcess])
+            ownProcessID = ownProcess
+            let description = CATapDescription(stereoGlobalTapButExcludeProcesses: includeOwnAudio ? [] : [ownProcess])
             description.name = "toneboy · System audio"
             description.isPrivate = true
             description.muteBehavior = .unmuted
@@ -143,6 +147,7 @@ final class SystemAudioEngine: AudioEngineControlling {
         guard let dsp, let description = tapDescription else {
             throw AudioFailure(message: "Start capture first.")
         }
+        description.processes = [ownProcessID]
         description.muteBehavior = .mutedWhenTapped
         var object = Unmanaged.passUnretained(description).toOpaque()
         var address = AudioProperty.address(kAudioTapPropertyDescription)

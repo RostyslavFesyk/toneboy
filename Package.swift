@@ -13,6 +13,7 @@ let package = Package(
                           linkerSettings: [.linkedFramework("Accelerate")]),
         .executableTarget(name: "SandboxProbe", dependencies: ["AudioDSP"]),
         .testTarget(name: "AudioDSPTests", dependencies: ["AudioDSP"]),
-        .testTarget(name: "LifecycleTests", dependencies: ["Tonebar"])
+        .testTarget(name: "LifecycleTests", dependencies: ["Tonebar"]),
+        .testTarget(name: "SelfTestSignalTests", dependencies: ["SandboxProbe"])
     ]
 )
