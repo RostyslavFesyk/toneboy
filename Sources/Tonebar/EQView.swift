@@ -9,6 +9,7 @@ private let accent = Color.accentColor
 
 struct EQView: View {
     @ObservedObject var model: EQModel
+    @StateObject private var loginItem = LoginItem()
     @StateObject private var palette = GradientStore()
     @State private var showGradients = false
     var body: some View {
@@ -32,6 +33,11 @@ struct EQView: View {
                     .accessibilityLabel("Equalizer")
                     .fixedSize().help("Turn the equalizer on or off")
                 Menu {
+                    Toggle("Launch at Login", isOn: Binding(get: { loginItem.enabled }, set: { loginItem.setEnabled($0) }))
+                    if loginItem.needsApproval {
+                        Button("Allow Launch at Login in Settings…") { loginItem.showSettings() }
+                    }
+                    Divider()
                     Button("Audio Access Settings…") { model.openAudioSettings() }
                     Divider()
                     Toggle("Auto Headroom", isOn: Binding(get: { model.autoGain }, set: { model.autoGain = $0; model.push() }))
@@ -93,7 +99,14 @@ struct EQView: View {
                 .animation(.spring(response: 0.6, dampingFraction: 0.88), value: model.running)
         )
         .preferredColorScheme(.light)
-        .onAppear { model.panelVisible = true }
+        .alert("Couldn’t update Launch at Login", isPresented: Binding(
+            get: { loginItem.error != nil }, set: { if !$0 { loginItem.error = nil } })) {
+                Button("OK") { loginItem.error = nil }
+            } message: { Text(loginItem.error ?? "") }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem.refresh()
+        }
+        .onAppear { model.panelVisible = true; loginItem.refresh() }
         .onDisappear { model.panelVisible = false }
         .onChange(of: model.running) { _, running in
             if !running { showGradients = false }

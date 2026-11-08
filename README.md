@@ -47,10 +47,12 @@ The legacy bundle identifier `app.tonebar.local` and internal Swift target name 
 bash test-stability.sh
 ```
 
-The suite currently includes 32 tests:
+The suite currently includes 38 tests:
 
 - 9 DSP tests: flat transparency, stereo independence, bell/shelf response, headroom, bypass, limiter, analyzer queue behavior, and unmuted verification output gating.
 - 18 lifecycle tests: verification success/failure, stale callbacks, cancellation, retries, output changes, sleep/wake, and 250 on/off cycles.
+- 4 login-item tests: registration, approval, external state changes, and error handling.
+- 2 single-instance tests: duplicate exclusion and lock release without deleting the lock file.
 - 5 signal tests: sample rates, low amplitude, silence, unrelated audio, louder synthetic background audio, and fades.
 
 Lifecycle tests exercise the production model with a simulated engine and capture verifier. They use isolated preferences and do not request permission, capture audio, change outputs, or put the Mac to sleep. Real Bluetooth reconnection, tap cleanup, dropouts, latency, CPU, and memory still need hardware testing.
@@ -82,15 +84,21 @@ Other current limitations:
 - Output changes are polled once per second and may cause a brief interruption.
 - Capture-protected audio may not be processed.
 - The limiter is not a mastering or true-peak limiter.
-- No launch-at-login setting, auto-updater, dynamic EQ, mid/side, or linear phase mode yet.
+- No auto-updater, dynamic EQ, mid/side, or linear phase mode yet.
 
 ## Roadmap
 
 - Test extended playback, sleep/wake, and speaker/AirPods/USB switching on real devices.
-- Add launch at login.
+- Validate Launch at Login on a signed build through a real logout/login.
 - Configure Developer ID signing, notarization, and a DMG release.
 - Add automatic updates.
 - Validate the public-API self-test across output devices and finish App Store packaging.
+
+## Beta packaging
+
+The menu includes **Launch at Login**, using macOS Service Management. If approval is required, it offers the system settings page. A second instance exits before creating an audio route.
+
+See [signed beta setup](docs/BETA_RELEASE.md) for Developer ID signing and notarization. A Developer account alone does not install a signing certificate on this Mac.
 
 ## Contributing
 

@@ -74,8 +74,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 enum TonebarApp {
     static func main() {
         let app = NSApplication.shared
+        let identifier = Bundle.main.bundleIdentifier ?? "app.tonebar.local"
+        let lockURL = FileManager.default.temporaryDirectory.appendingPathComponent(identifier + ".instance.lock")
+        guard let instanceLock = SingleInstanceLock(url: lockURL) else {
+            NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+                .first(where: { $0.processIdentifier != getpid() })?
+                .activate(options: [.activateIgnoringOtherApps])
+            return
+        }
         let delegate = AppDelegate()
         app.delegate = delegate
-        withExtendedLifetime(delegate) { app.run() }
+        withExtendedLifetime((delegate, instanceLock)) { app.run() }
     }
 }
