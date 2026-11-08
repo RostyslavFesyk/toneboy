@@ -37,7 +37,7 @@ The build script produces an ad-hoc signed `toneboy.app` beside the repository. 
 
 You can also open `Package.swift` in Xcode to edit and debug the Swift package. Use the packaged `.app` for permission and end-user testing; it includes the audio usage description in `Info.plist`.
 
-On first launch, allow system audio access. If access is denied, use **Open System Settings** and enable toneboy in the audio recording privacy settings. On returning, the app retries a short, quiet audio self-test and starts EQ only when it recognizes the signal. A failed check can also indicate an output problem; it is not a definitive permission status. The top-right switch stops processing and restores normal playback.
+On first launch, allow system audio access. If access is denied, use **Open System Settings** and enable toneboy in the audio recording privacy settings. On returning, the app retries a short, quiet audio self-test and starts EQ only after observing sustained incoming audio or recognizing its test signal. The pilot is used when the route is quiet, with one bounded retry for output startup. A failed check can also indicate an output problem; it is not a definitive permission status. The top-right switch stops processing and restores normal playback.
 
 The legacy bundle identifier `app.tonebar.local` and internal Swift target name `Tonebar` are retained to preserve development settings. The app is called **toneboy**.
 
@@ -47,12 +47,13 @@ The legacy bundle identifier `app.tonebar.local` and internal Swift target name 
 bash test-stability.sh
 ```
 
-The suite currently includes 38 tests:
+The suite currently includes 42 tests:
 
 - 9 DSP tests: flat transparency, stereo independence, bell/shelf response, headroom, bypass, limiter, analyzer queue behavior, and unmuted verification output gating.
 - 18 lifecycle tests: verification success/failure, stale callbacks, cancellation, retries, output changes, sleep/wake, and 250 on/off cycles.
 - 4 login-item tests: registration, approval, external state changes, and error handling.
 - 2 single-instance tests: duplicate exclusion and lock release without deleting the lock file.
+- 4 capture-activity tests: sustained audio, denied zeros, DC, isolated spikes, short transients, and invalid data.
 - 5 signal tests: sample rates, low amplitude, silence, unrelated audio, louder synthetic background audio, and fades.
 
 Lifecycle tests exercise the production model with a simulated engine and capture verifier. They use isolated preferences and do not request permission, capture audio, change outputs, or put the Mac to sleep. Real Bluetooth reconnection, tap cleanup, dropouts, latency, CPU, and memory still need hardware testing.

@@ -129,6 +129,12 @@ final class EQModel: ObservableObject {
         else if wantsAudio && !running { start() }
     }
 
+    private func audioDiagnostic(_ message: String) {
+        if ProcessInfo.processInfo.environment["TONEBOY_AUDIO_DIAGNOSTICS"] == "1" {
+            print("toneboy: \(message)")
+        }
+    }
+
     func start() {
         guard !running, !starting else { return }
         error = nil
@@ -156,6 +162,7 @@ final class EQModel: ObservableObject {
                         try self.engine.enableProcessing()
                         self.audioAccess = .verified
                         self.started = Date()
+                        self.audioDiagnostic("Processing enabled")
                         self.running = true
                         self.starting = false
                     } catch {
@@ -163,6 +170,7 @@ final class EQModel: ObservableObject {
                         self.starting = false
                         self.wantsAudio = false
                         self.audioAccess = .failed
+                        self.audioDiagnostic("Processing failed: \(error.localizedDescription)")
                         self.error = error.localizedDescription
                     }
                 } else {
@@ -192,6 +200,7 @@ final class EQModel: ObservableObject {
         }
     }
     func stop() {
+        audioDiagnostic("Stopping audio")
         resumeAfterSleep = false
         wantsAudio = false
         retryAfterActivation = false
@@ -251,6 +260,7 @@ final class EQModel: ObservableObject {
         }
         guard running else { return }
         if ticks % 30 == 0, engine.routeChanged() {
+            audioDiagnostic("Output route changed; restarting")
             stop(); start(); return
         }
         guard let dsp = engine.dsp else { return }

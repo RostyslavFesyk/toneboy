@@ -51,10 +51,13 @@ public struct SelfTestSignal {
 
 public final class SelfTestPlayer {
     public init() {}
-    private let audio = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    private var audio: AVAudioEngine?
+    private var player: AVAudioPlayerNode?
     public func play(_ signal: SelfTestSignal, rate: Double) throws {
         stop()
+        // A fresh engine binds to the current output after Bluetooth/device changes.
+        let audio = AVAudioEngine()
+        let player = AVAudioPlayerNode()
         let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2)!
         let values = signal.samples(rate: rate)
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(values.count))!
@@ -66,10 +69,15 @@ public final class SelfTestPlayer {
         }
         if player.engine == nil { audio.attach(player) }
         audio.connect(player, to: audio.mainMixerNode, format: format)
+        self.audio = audio
+        self.player = player
         try audio.start()
         player.scheduleBuffer(buffer)
         player.play()
     }
-    public func stop() { player.stop(); audio.stop() }
+    public func stop() {
+        player?.stop(); audio?.stop()
+        player = nil; audio = nil
+    }
     deinit { stop() }
 }

@@ -172,13 +172,16 @@ struct EQGraph: View, Animatable {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.gray.opacity(0.7))
                     if model.audioAccess == .needsHelp {
-                        Text("Allow System Audio Recording in Settings, then return here.\nIf access is already enabled, check your output and retry.")
+                        Text("Check your audio output and try again.\nIf this continues, check System Audio Recording access.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
-                        Button("Open System Settings") { model.openAudioSettings() }
-                            .font(.system(size: 11, weight: .medium))
-                            .buttonStyle(.bordered)
+                        HStack {
+                            Button("Try Again") { model.start() }
+                            Button("Open System Settings") { model.openAudioSettings() }
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .buttonStyle(.bordered)
                     }
                 }
                 .scaleEffect(showBypassMessage ? 1 : 0.9)

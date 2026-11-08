@@ -30,3 +30,9 @@ The package contains no extra audio driver or helper installer. Ask testers to e
 ## Current validation
 
 The initial missing-identity preflight and script syntax were checked. A Developer ID Application identity was subsequently installed, and the beta was signed with hardened runtime and a secure timestamp. Apple notarization returned Accepted; ticket stapling and validation succeeded; Gatekeeper accepted the app as Notarized Developer ID. The final ZIP was produced after stapling. These steps were executed individually using the same commands as the release script. Hardware testing and a real logout/login remain outstanding.
+
+### 0.1.1 audio verification fix
+
+Loud incoming audio could mask the quiet pilot and incorrectly leave EQ disabled. Startup now accepts sustained, varying captured audio before playing a pilot; silence still requires recognizing the pilot. The player is recreated for the current output and verification has one bounded retry. Failed verification offers Try Again without asserting that permission was denied.
+
+All 42 automated tests passed. During an AirPods diagnostic run, incoming music passed the activity check; after AirPods were disconnected, a silent MacBook speaker route passed the pilot check and enabled processing. Full on/off and reconnect validation on AirPods remains outstanding. No recorded audio is persisted; optional diagnostics contain only levels, counts and lifecycle events.
