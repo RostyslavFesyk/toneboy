@@ -9,6 +9,8 @@
 #define TB_BANDS 4
 typedef struct TBDSP TBDSP;
 TBDSP *tb_create(double sampleRate);
+void tb_set_render_output(TBDSP *dsp, bool enabled);
+float tb_input_peak(TBDSP *dsp);
 void tb_destroy(TBDSP *dsp);
 void tb_set_band(TBDSP *dsp, int band, double frequency, double gainDB, double q);
 void tb_set_output(TBDSP *dsp, double gainDB, bool bypass);

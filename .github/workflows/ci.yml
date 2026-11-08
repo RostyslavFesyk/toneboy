@@ -2,7 +2,7 @@ name: macOS checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, "experiment/**"]
   pull_request:
   workflow_dispatch:
 
@@ -31,3 +31,7 @@ jobs:
         run: bash build.sh
       - name: Verify app signature
         run: codesign --verify --strict --verbose=2 ../toneboy.app
+      - name: Build public-API sandbox probe
+        run: bash build-sandbox-probe.sh
+      - name: Audit sandbox probe
+        run: bash verify-sandbox-probe.sh

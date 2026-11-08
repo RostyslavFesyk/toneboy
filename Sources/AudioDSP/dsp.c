@@ -13,7 +13,8 @@ typedef struct { double z1, z2; } State;
 struct TBDSP {
     double rate;
     _Atomic double frequency[TB_BANDS], gain[TB_BANDS], q[TB_BANDS], output;
-    _Atomic bool bypass;
+    _Atomic bool bypass, renderOutput;
+    _Atomic float inputPeak;
     _Atomic uint32_t generation;
     uint32_t appliedGeneration, rampRemaining, inputOffset;
     Coeff current[TB_BANDS], target[TB_BANDS];
@@ -57,6 +58,7 @@ TBDSP *tb_create(double sampleRate) {
     if (!d) { return NULL; }
     d->rate = sampleRate; d->volume = 1.0; d->limiter = 1.0;
     atomic_init(&d->generation, 0); atomic_init(&d->output, 0);
+    atomic_init(&d->renderOutput, true); atomic_init(&d->inputPeak, 0);
     atomic_init(&d->bypass, false); atomic_init(&d->readIndex, 0);
     atomic_init(&d->writeIndex, 0); atomic_init(&d->peak, 0);
     atomic_init(&d->callbacks, 0);
@@ -68,9 +70,12 @@ TBDSP *tb_create(double sampleRate) {
     }
     // The audio callback must never enter a library fallback lock.
     if (!atomic_is_lock_free(&d->frequency[0]) || !atomic_is_lock_free(&d->peak) ||
-        !atomic_is_lock_free(&d->callbacks)) { free(d); return NULL; }
+        !atomic_is_lock_free(&d->callbacks) || !atomic_is_lock_free(&d->renderOutput) ||
+        !atomic_is_lock_free(&d->inputPeak)) { free(d); return NULL; }
     return d;
 }
+void tb_set_render_output(TBDSP *d, bool enabled) { atomic_store(&d->renderOutput, enabled); }
+float tb_input_peak(TBDSP *d) { return atomic_load(&d->inputPeak); }
 void tb_destroy(TBDSP *d) { free(d); }
 void tb_set_band(TBDSP *d, int i, double f, double db, double q) {
     if (!d || i < 0 || i >= TB_BANDS || !isfinite(f) || !isfinite(db) || !isfinite(q)) { return; }
@@ -240,13 +245,20 @@ OSStatus tb_audio_callback(AudioObjectID device, const AudioTimeStamp *now,
             if (!frames || count < frames) { frames = count; }
         }
     }
-    beginBlock(d); float peak = 0;
+    beginBlock(d); float peak = 0, inputPeak = 0;
+    bool renderOutput = atomic_load(&d->renderOutput);
     for (uint32_t i = 0; i < frames; ++i) {
         float left, right;
-        frame(d, readChannel(input, d->inputOffset, i), readChannel(input, d->inputOffset+1, i), &left, &right);
-        writeChannel(output, 0, i, left); writeChannel(output, 1, i, right);
+        float inLeft = readChannel(input, d->inputOffset, i);
+        float inRight = readChannel(input, d->inputOffset+1, i);
+        inputPeak = fmaxf(inputPeak, fmaxf(fabsf(inLeft), fabsf(inRight)));
+        frame(d, inLeft, inRight, &left, &right);
+        if (renderOutput) {
+            writeChannel(output, 0, i, left); writeChannel(output, 1, i, right);
+        }
         peak = fmaxf(peak, fmaxf(fabsf(left), fabsf(right)));
     }
+    atomic_store(&d->inputPeak, inputPeak);
     atomic_store_explicit(&d->peak, peak, memory_order_relaxed);
     return noErr;
 }

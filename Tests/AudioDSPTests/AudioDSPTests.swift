@@ -107,3 +107,46 @@ final class AudioDSPTests: XCTestCase {
         XCTAssertEqual(tb_read_analysis(d,&samples,2048), 0)
     }
 }
+
+extension AudioDSPTests {
+    private func captureCallback(_ dsp: OpaquePointer, input: [Float]) -> [Float] {
+        var input = input
+        var output = [Float](repeating: 9, count: input.count)
+        let byteCount = UInt32(input.count * MemoryLayout<Float>.size)
+        input.withUnsafeMutableBytes { source in
+            output.withUnsafeMutableBytes { destination in
+                var inputList = AudioBufferList(mNumberBuffers: 1,
+                    mBuffers: AudioBuffer(mNumberChannels: 2, mDataByteSize: byteCount, mData: source.baseAddress))
+                var outputList = AudioBufferList(mNumberBuffers: 1,
+                    mBuffers: AudioBuffer(mNumberChannels: 2, mDataByteSize: byteCount, mData: destination.baseAddress))
+                var time = AudioTimeStamp()
+                XCTAssertEqual(tb_audio_callback(0, &time, &inputList, &time, &outputList, &time,
+                                                 UnsafeMutableRawPointer(dsp)), 0)
+            }
+        }
+        return output
+    }
+    func testCaptureProbeObservesInputWithoutRenderingDuplicateAudio() {
+        let dsp = tb_create(48000)!
+        defer { tb_destroy(dsp) }
+        tb_set_render_output(dsp, false)
+        let input = (0..<1024).map { $0.isMultiple(of: 2) ? Float(0.25) : Float(-0.25) }
+        XCTAssertTrue(captureCallback(dsp, input: input).allSatisfy { $0 == 0 })
+        XCTAssertEqual(tb_input_peak(dsp), 0.25, accuracy: 0.000001)
+        XCTAssertEqual(tb_callback_count(dsp), 1)
+        tb_set_render_output(dsp, true)
+        XCTAssertTrue(captureCallback(dsp, input: input).contains { abs($0) > 0.1 })
+    }
+    func testSilentCallbacksAreNotEvidenceOfPermission() {
+        let dsp = tb_create(48000)!
+        defer { tb_destroy(dsp) }
+        tb_set_render_output(dsp, false)
+        _ = captureCallback(dsp, input: Array(repeating: 0, count: 1024))
+        XCTAssertEqual(tb_callback_count(dsp), 1)
+        XCTAssertEqual(tb_input_peak(dsp), 0)
+        _ = captureCallback(dsp, input: Array(repeating: 0.2, count: 1024))
+        XCTAssertGreaterThan(tb_input_peak(dsp), 0)
+        _ = captureCallback(dsp, input: Array(repeating: 0, count: 1024))
+        XCTAssertEqual(tb_input_peak(dsp), 0, "A previous signal must not imply a current permission grant")
+    }
+}

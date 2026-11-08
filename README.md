@@ -1,5 +1,7 @@
 # toneboy
 
+> This experimental branch adds a separate public-API sandbox probe. See [App Store feasibility results](docs/APP_STORE_FEASIBILITY.md). The normal app remains unchanged in `main`; the probe is not a production permission flow.
+
 A native macOS menu bar equalizer for your whole Mac. Shape the sound of music, videos, games, and notifications with a four-band EQ, a live spectrum, and audio-reactive gradients.
 
 **Early development.** The current build is for direct distribution, not the Mac App Store. Release signing and notarization are not configured yet.
