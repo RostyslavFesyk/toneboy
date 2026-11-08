@@ -52,12 +52,15 @@ protocol AudioEngineControlling: AnyObject {
     var sampleRate: Double { get }
     var outputName: String { get }
     func start() throws
+    func enableProcessing() throws
     func stop()
     func routeChanged() -> Bool
 }
 
 final class SystemAudioEngine: AudioEngineControlling {
     private(set) var dsp: OpaquePointer?
+    private var ownProcessID = AudioObjectID(0)
+    private var tapDescription: CATapDescription?
     private var tapID: AudioObjectID = 0
     private var aggregateID: AudioObjectID = 0
     private var ioProc: AudioDeviceIOProcID?
@@ -67,11 +70,10 @@ final class SystemAudioEngine: AudioEngineControlling {
 
     deinit { stop() }
 
-    func start() throws {
+    func start() throws { try start(includeOwnAudio: true) }
+
+    func start(includeOwnAudio: Bool) throws {
         stop()
-        guard SystemAudioPermission.status() == .authorized else {
-            throw AudioFailure(message: "System audio access is required. Enable toneboy in System Settings.")
-        }
         do {
             outputID = try AudioProperty.defaultOutput()
             guard outputID != 0 else { throw AudioFailure(message: "Connect headphones or speakers and try again.") }
@@ -90,10 +92,12 @@ final class SystemAudioEngine: AudioEngineControlling {
                 UInt32(MemoryLayout<pid_t>.size), &pid, &size, &ownProcess), "Could not exclude the app’s own audio")
             guard ownProcess != 0 else { throw AudioFailure(message: "Core Audio is not ready. Try turning the equalizer on again.") }
 
-            let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [ownProcess])
+            ownProcessID = ownProcess
+            let description = CATapDescription(stereoGlobalTapButExcludeProcesses: includeOwnAudio ? [] : [ownProcess])
             description.name = "toneboy · System audio"
             description.isPrivate = true
-            description.muteBehavior = .mutedWhenTapped
+            description.muteBehavior = .unmuted
+            tapDescription = description
             try AudioProperty.check(AudioHardwareCreateProcessTap(description, &tapID), "Could not connect to system audio")
             let format = try AudioProperty.value(tapID, kAudioTapPropertyFormat, initial: AudioStreamBasicDescription())
             guard format.mFormatID == kAudioFormatLinearPCM, format.mBitsPerChannel == 32,
@@ -127,11 +131,31 @@ final class SystemAudioEngine: AudioEngineControlling {
             try validateStreams(scope: kAudioObjectPropertyScopeOutput)
             guard let state = tb_create(sampleRate) else { throw AudioFailure(message: "Could not initialize audio processing.") }
             dsp = state
+            tb_set_render_output(state, false)
             tb_set_input_offset(state, physicalInputs)
             try AudioProperty.check(AudioDeviceCreateIOProcID(aggregateID, tb_audio_callback, UnsafeMutableRawPointer(state), &ioProc), "Could not create the audio stream")
             // Never enable a microphone stream when a headset exposes both input and output.
             try AudioProperty.check(tb_disable_physical_inputs(aggregateID, ioProc, physicalInputs), "Could not disable microphone inputs on the audio route")
             try AudioProperty.check(AudioDeviceStart(aggregateID, ioProc), "Could not start audio")
+        } catch {
+            stop()
+            throw error
+        }
+    }
+
+    // Called only after real input samples have been observed in this live route.
+    func enableProcessing() throws {
+        guard let dsp, let description = tapDescription else {
+            throw AudioFailure(message: "Start capture first.")
+        }
+        description.processes = [ownProcessID]
+        description.muteBehavior = .mutedWhenTapped
+        var object = Unmanaged.passUnretained(description).toOpaque()
+        var address = AudioProperty.address(kAudioTapPropertyDescription)
+        do {
+            try AudioProperty.check(AudioObjectSetPropertyData(tapID, &address, 0, nil,
+                UInt32(MemoryLayout<UnsafeMutableRawPointer>.size), &object), "Could not enable tap muting")
+            tb_set_render_output(dsp, true)
         } catch {
             stop()
             throw error
@@ -173,6 +197,7 @@ final class SystemAudioEngine: AudioEngineControlling {
         aggregateID = 0
         if tapID != 0 { AudioHardwareDestroyProcessTap(tapID) }
         tapID = 0
+        tapDescription = nil
         if let dsp { tb_destroy(dsp) }
         dsp = nil
     }

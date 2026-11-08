@@ -12,6 +12,12 @@ private final class FakeEngine: AudioEngineControlling {
     var stops = 0
     var active = false
     var changedRoute = false
+    var enables = 0
+    var enableFailure = false
+    func enableProcessing() throws {
+        if enableFailure { throw AudioFailure(message: "Enable failed") }
+        enables += 1
+    }
     var failures: [AudioFailure] = []
     func start() throws {
         starts += 1
@@ -25,26 +31,22 @@ private final class FakeEngine: AudioEngineControlling {
     }
 }
 
-private final class PermissionStub {
-    var status: SystemAudioPermission.Status = .authorized
-    var requests = 0
-    var completion: ((SystemAudioPermission.Status) -> Void)?
-    func request(_ completion: @escaping (SystemAudioPermission.Status) -> Void) {
-        requests += 1
+private final class VerificationStub: CaptureVerifying {
+    var immediate: Bool? = true
+    var completion: ((Bool) -> Void)?
+    func begin(dsp: OpaquePointer?, rate: Double, completion: @escaping (Bool) -> Void) {
         self.completion = completion
+        if let immediate { completion(immediate) }
     }
-    func resolve(_ result: SystemAudioPermission.Status) {
-        status = result
-        let callback = completion
-        completion = nil
-        callback?(result)
-    }
+    // Intentionally retain callback to test stale completions after cancellation.
+    func cancel() {}
+    func resolve(_ result: Bool) { completion?(result) }
 }
 
 @MainActor
 final class LifecycleTests: XCTestCase {
     private var engine: FakeEngine!
-    private var permission: PermissionStub!
+    private var verification: VerificationStub!
     private var model: EQModel!
     private var defaults: UserDefaults!
     private var suite: String!
@@ -52,11 +54,10 @@ final class LifecycleTests: XCTestCase {
     override func setUp() {
         super.setUp()
         engine = FakeEngine()
-        permission = PermissionStub()
+        verification = VerificationStub()
         suite = "toneboy.lifecycle-tests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)!
-        model = EQModel(engine: engine, permissionStatus: { [permission] in permission!.status },
-                        requestPermission: { [permission] in permission!.request($0) },
+        model = EQModel(engine: engine, verifier: verification,
                         defaults: defaults, monitorSystem: false)
     }
     override func tearDown() {
@@ -66,68 +67,69 @@ final class LifecycleTests: XCTestCase {
         super.tearDown()
     }
 
-    func testAuthorizedStartsWithoutPlayingMusicAndIgnoresDuplicateStart() {
+    func testVerifiedStartsWithoutMusicAndIgnoresDuplicateStart() {
         model.start()
         model.start()
         XCTAssertTrue(model.running)
         XCTAssertFalse(model.starting)
-        XCTAssertTrue(engine.active)
         XCTAssertEqual(engine.starts, 1)
-        XCTAssertEqual(permission.requests, 0)
+        XCTAssertEqual(engine.enables, 1)
     }
-    func testDeniedNeverStartsMutingEngineAndGrantResumesAutomatically() {
-        permission.status = .denied
+    func testFailedVerificationNeverMutesAndReturnFromSettingsRetries() {
+        verification.immediate = false
         model.start()
-        for _ in 0..<100 { model.resumeAfterAudioSettings() }
         XCTAssertFalse(model.running)
-        XCTAssertEqual(engine.starts, 0)
-        XCTAssertEqual(permission.requests, 0)
-        permission.status = .authorized
+        XCTAssertFalse(engine.active)
+        XCTAssertEqual(engine.enables, 0)
+        XCTAssertEqual(model.audioAccess, .needsHelp)
+        verification.immediate = true
         model.resumeAfterAudioSettings()
         XCTAssertTrue(model.running)
-        XCTAssertEqual(engine.starts, 1)
+        XCTAssertEqual(engine.starts, 2)
     }
-    func testFirstUseWaitsForConsentThenStarts() {
-        permission.status = .undetermined
+    func testWaitingForVerificationNeverEnablesProcessing() {
+        verification.immediate = nil
         model.start()
         model.start()
         XCTAssertTrue(model.starting)
         XCTAssertFalse(model.running)
-        XCTAssertEqual(engine.starts, 0)
-        XCTAssertEqual(permission.requests, 1)
-        permission.resolve(.authorized)
-        XCTAssertTrue(model.running)
         XCTAssertEqual(engine.starts, 1)
+        XCTAssertEqual(engine.enables, 0)
+        verification.resolve(true)
+        XCTAssertTrue(model.running)
+        XCTAssertEqual(engine.enables, 1)
     }
-    func testDeclinedRequestLeavesEngineStopped() {
-        permission.status = .undetermined
-        model.start()
-        permission.resolve(.denied)
-        XCTAssertFalse(model.running)
-        XCTAssertFalse(model.starting)
-        XCTAssertEqual(model.audioAccess, .denied)
-        XCTAssertEqual(engine.starts, 0)
-    }
-    func testLateConsentCannotUndoManualStop() {
-        permission.status = .undetermined
+    func testLateVerificationCannotUndoManualStop() {
+        verification.immediate = nil
         model.start()
         model.stop()
-        permission.resolve(.authorized)
+        verification.resolve(true)
         model.resumeAfterAudioSettings()
         XCTAssertFalse(model.running)
-        XCTAssertEqual(engine.starts, 0)
+        XCTAssertEqual(engine.enables, 0)
     }
-    func testRevocationStopsRouteAndRegrantRestarts() {
+    func testReturnFromConsentDuringCheckRetriesOnceOnFailure() {
+        verification.immediate = nil
         model.start()
-        permission.status = .denied
         model.resumeAfterAudioSettings()
-        XCTAssertFalse(model.running)
-        XCTAssertFalse(engine.active)
-        XCTAssertEqual(engine.stops, 1)
-        permission.status = .authorized
-        model.resumeAfterAudioSettings()
-        XCTAssertTrue(model.running)
+        verification.resolve(false)
         XCTAssertEqual(engine.starts, 2)
+        XCTAssertTrue(model.starting)
+        verification.resolve(false)
+        XCTAssertEqual(engine.starts, 2)
+        XCTAssertFalse(model.starting)
+    }
+    func testOldCompletionCannotEnableNewRoute() {
+        verification.immediate = nil
+        model.start()
+        let old = verification.completion
+        model.stop()
+        model.start()
+        old?(true)
+        XCTAssertFalse(model.running)
+        XCTAssertEqual(engine.enables, 0)
+        verification.resolve(true)
+        XCTAssertTrue(model.running)
     }
     func testManualBypassDoesNotAutoEnableOnFocus() {
         model.start()
@@ -136,15 +138,21 @@ final class LifecycleTests: XCTestCase {
         XCTAssertFalse(model.running)
         XCTAssertEqual(engine.starts, 1)
     }
-    func testUnavailablePermissionFailsClosed() {
-        permission.status = .unavailable
+    func testEnableFailureStopsRoute() {
+        engine.enableFailure = true
         model.start()
+        XCTAssertFalse(engine.active)
         XCTAssertFalse(model.running)
+        XCTAssertFalse(model.starting)
         XCTAssertNotNil(model.error)
-        XCTAssertEqual(engine.starts, 0)
-        for value in [-1, 3, 255, Int.max] {
-            XCTAssertEqual(SystemAudioPermission.Status.decode(value), .unavailable)
-        }
+        XCTAssertEqual(model.audioAccess, .failed)
+    }
+    func testFailedVerificationDoesNotRepeatFromAnalysisLoop() {
+        verification.immediate = false
+        model.start()
+        for _ in 0..<300 { model.tick() }
+        XCTAssertEqual(engine.starts, 1)
+        XCTAssertEqual(engine.enables, 0)
     }
     func testNonTransientFailureDoesNotRetryForever() {
         engine.failures = [AudioFailure(message: "Unsupported output")]

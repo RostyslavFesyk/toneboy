@@ -1,10 +1,10 @@
 # App Store feasibility experiment
 
-Branch: `experiment/app-store-sandbox`. This is an isolated diagnostic app, not an App Store-ready edition or a replacement for toneboy's permission UI.
+The diagnostic sandbox probe established the public-API self-test approach. The normal toneboy app now uses that approach too; neither package is an App Store-ready release.
 
 ## What was built
 
-`SandboxProbe` is a separate executable target that depends only on `AudioDSP`. It does not compile or link the production `Tonebar` target or its private permission adapter. The copied audio-engine implementation is intentionally local to this spike; consolidate it only after deciding on a production approach.
+`SandboxProbe` is a separate executable target sharing `AudioDSP` and `CaptureVerification` with `Tonebar`. Neither target contains a private permission adapter. The probe retains its separate audio-engine copy for diagnostic isolation.
 
 The bundle is `app.toneboy.sandboxprobe`, with App Sandbox and the Audio Input entitlement enabled. It uses the documented Core Audio process tap APIs and `NSAudioCaptureUsageDescription`. No private TCC framework is loaded, and no permission database is read or changed.
 
@@ -16,6 +16,17 @@ open '../toneboy Sandbox Probe.app' --args --start-capture
 
 The build is ad-hoc signed by default. Set `TONEBOY_SIGN_IDENTITY` for a suitable local signing identity. This is not an App Store-signed or notarized release.
 
+## Main-app integration
+
+- Removed the private TCC permission adapter; CI now audits the main binary as well as the probe.
+- Startup remains unmuted until verification succeeds. Manual stop cancels the verifier before destroying its DSP pointer; generation checks reject stale completions.
+- Returning from Settings retries verification. Returning during a pending check permits one bounded retry if that check fails. This is not a permission-state query or an automatic relaunch service.
+- Existing sleep/wake and output reconnection reverify the new route. Silence after successful verification does not disable EQ.
+- Detection now uses windowed two-tone correlation against neighboring frequency bins, allowing unrelated louder audio without requiring the test signal to dominate total energy.
+- 32 automated tests pass, including a louder synthetic audio mixture, stale completion, failed enable, bounded retry, and cancellation scenarios. Real music/device coverage remains outstanding.
+- On this Mac, the rebuilt normal toneboy app automatically enabled EQ with existing access, and manual off/on successfully repeated verification. Existing identity and preferences remain unchanged. Main-app denial was not retested; denial was tested in the isolated sandbox probe as recorded below.
+- The normal build remains non-sandboxed. Sandbox preference migration, signing, distribution, and review are separate remaining tasks.
+
 ## Current experiment: in-app verification sound
 
 The probe now verifies capture automatically using a quiet, 0.7-second two-tone challenge generated in memory with AVAudioEngine. The two frequencies are randomized per attempt. No driver, helper installation, audio file, or ScreenCaptureKit permission is needed.
@@ -24,7 +35,7 @@ Initially the global tap includes the app itself, stays unmuted, and has its pro
 
 If verification fails, the route is destroyed and the UI offers Settings and retry. Failure is **not** labeled as definitive permission denial: muted output, competing audio, or an unsupported route may also prevent the challenge being recognized. Verification does not persist a claimed permission grant across launches.
 
-This remains a feasibility implementation. Runtime revocation while already processing, first-ever consent that takes a long time, silent/muted output, simultaneous music, Bluetooth route latency, and automatic restart after macOS terminates the app still require validation before replacing the production permission flow.
+This remains a feasibility implementation. Runtime revocation while already processing, first-ever consent that takes a long time, silent/muted output, simultaneous music, Bluetooth route latency, and automatic restart after macOS terminates the app still require broader validation before release. The integrated flow is available for local testing.
 
 Starting the tap triggers macOS's own consent request; no private permission preflight is used. Returning from Settings retries capture if the process survived. Route changes, sleep, and missing callbacks stop the experimental route. This is not a complete production reconnect policy.
 

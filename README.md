@@ -1,6 +1,6 @@
 # toneboy
 
-> This experimental branch adds a separate public-API sandbox probe. See [App Store feasibility results](docs/APP_STORE_FEASIBILITY.md). The normal app remains unchanged in `main`; the probe is not a production permission flow.
+> Audio startup uses a public-API functional self-test. See [App Store feasibility results and remaining validation](docs/APP_STORE_FEASIBILITY.md).
 
 A native macOS menu bar equalizer for your whole Mac. Shape the sound of music, videos, games, and notifications with a four-band EQ, a live spectrum, and audio-reactive gradients.
 
@@ -37,7 +37,7 @@ The build script produces an ad-hoc signed `toneboy.app` beside the repository. 
 
 You can also open `Package.swift` in Xcode to edit and debug the Swift package. Use the packaged `.app` for permission and end-user testing; it includes the audio usage description in `Info.plist`.
 
-On first launch, allow system audio access. If access is denied, use **Open System Settings** and enable toneboy in the audio recording privacy settings. The app rechecks permission and retries startup automatically. The top-right switch stops processing and restores normal playback.
+On first launch, allow system audio access. If access is denied, use **Open System Settings** and enable toneboy in the audio recording privacy settings. On returning, the app retries a short, quiet audio self-test and starts EQ only when it recognizes the signal. A failed check can also indicate an output problem; it is not a definitive permission status. The top-right switch stops processing and restores normal playback.
 
 The legacy bundle identifier `app.tonebar.local` and internal Swift target name `Tonebar` are retained to preserve development settings. The app is called **toneboy**.
 
@@ -47,12 +47,13 @@ The legacy bundle identifier `app.tonebar.local` and internal Swift target name 
 bash test-stability.sh
 ```
 
-The suite currently includes 24 tests:
+The suite currently includes 32 tests:
 
-- 7 DSP tests: flat transparency, stereo independence, bell/shelf response, headroom, bypass, limiter, and analyzer queue behavior.
-- 17 lifecycle tests: consent, denial, regrant, revocation, cancellation, retries, output changes, sleep/wake, and 250 on/off cycles.
+- 9 DSP tests: flat transparency, stereo independence, bell/shelf response, headroom, bypass, limiter, analyzer queue behavior, and unmuted verification output gating.
+- 18 lifecycle tests: verification success/failure, stale callbacks, cancellation, retries, output changes, sleep/wake, and 250 on/off cycles.
+- 5 signal tests: sample rates, low amplitude, silence, unrelated audio, louder synthetic background audio, and fades.
 
-Lifecycle tests exercise the production model with a simulated engine and permission provider. They use isolated preferences and do not request permission, capture audio, change outputs, or put the Mac to sleep. Real Bluetooth reconnection, tap cleanup, dropouts, latency, CPU, and memory still need hardware testing.
+Lifecycle tests exercise the production model with a simulated engine and capture verifier. They use isolated preferences and do not request permission, capture audio, change outputs, or put the Mac to sleep. Real Bluetooth reconnection, tap cleanup, dropouts, latency, CPU, and memory still need hardware testing.
 
 GitHub Actions runs the tests and a release build on pushes and pull requests.
 
@@ -65,15 +66,15 @@ GitHub Actions runs the tests and a release build on pushes and pull requests.
 | FFT spectrum analysis | `Sources/Tonebar/Spectrum.swift` |
 | UI and interaction | `Sources/Tonebar/EQView.swift` |
 | Audio lifecycle and persistent settings | `Sources/Tonebar/EQModel.swift` |
-| System audio permission adapter | `Sources/Tonebar/SystemAudioPermission.swift` |
+| Audio capture verification | `Sources/Tonebar/CaptureVerifier.swift`, `Sources/CaptureVerification` |
 
 The audio route uses a private temporary Core Audio tap and aggregate device. It does not change the default output device. Audio stays in memory.
 
 ## Distribution and limitations
 
-The permission adapter uses private TCC functions (`TCCAccessPreflight` and `TCCAccessRequest`). It checks permission before creating a muting tap, fails closed on unknown results, and does not read or modify the TCC database. Private API availability may change between macOS versions.
+Startup creates an unmuted capture route with rendering disabled, then plays a quiet randomized two-tone challenge. The app enables muting and EQ output only after recognizing the challenge through that route. Failure tears down capture and leaves normal system playback intact. The app uses no private TCC entry points. Manual bypass cancels any pending verification.
 
-**This build is not eligible for Mac App Store submission.** An App Store edition needs a public-API permission flow, working App Sandbox support, and separate distribution validation. See [Apple’s review requirements](https://developer.apple.com/app-store/review/guidelines/#software-requirements).
+**This build is not yet an App Store release.** The normal app retains its existing non-sandbox packaging and preferences. The separate sandbox probe validates public-API feasibility; sandbox migration, signing, hardware coverage, and review remain outstanding. See [Apple’s review requirements](https://developer.apple.com/app-store/review/guidelines/#software-requirements).
 
 Other current limitations:
 
@@ -89,7 +90,7 @@ Other current limitations:
 - Add launch at login.
 - Configure Developer ID signing, notarization, and a DMG release.
 - Add automatic updates.
-- Investigate an App Store-compatible audio and permission implementation.
+- Validate the public-API self-test across output devices and finish App Store packaging.
 
 ## Contributing
 
@@ -99,7 +100,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Small, focused changes with reproducible
 
 - [Apple Core Audio taps](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps).
 - [W3C Audio EQ Cookbook](https://www.w3.org/TR/audio-eq-cookbook/) for filter coefficient formulas.
-- [AudioCap](https://github.com/insidegui/AudioCap) for reference documentation of the TCC permission ABI. The adapter is implemented here; AudioCap is not bundled.
+- [AudioCap](https://github.com/insidegui/AudioCap) provided reference documentation for the earlier permission adapter, which has now been removed. AudioCap is not bundled.
 
 ## License
 

@@ -9,11 +9,12 @@ let package = Package(
     targets: [
         .target(name: "AudioDSP", publicHeadersPath: "include",
                 linkerSettings: [.linkedFramework("CoreAudio")]),
-        .executableTarget(name: "Tonebar", dependencies: ["AudioDSP"],
+        .target(name: "CaptureVerification"),
+        .executableTarget(name: "Tonebar", dependencies: ["AudioDSP", "CaptureVerification"],
                           linkerSettings: [.linkedFramework("Accelerate")]),
-        .executableTarget(name: "SandboxProbe", dependencies: ["AudioDSP"]),
+        .executableTarget(name: "SandboxProbe", dependencies: ["AudioDSP", "CaptureVerification"]),
         .testTarget(name: "AudioDSPTests", dependencies: ["AudioDSP"]),
         .testTarget(name: "LifecycleTests", dependencies: ["Tonebar"]),
-        .testTarget(name: "SelfTestSignalTests", dependencies: ["SandboxProbe"])
+        .testTarget(name: "SelfTestSignalTests", dependencies: ["CaptureVerification"])
     ]
 )

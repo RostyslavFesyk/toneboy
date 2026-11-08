@@ -25,8 +25,9 @@ final class EQModel: ObservableObject {
     @Published var running = false
     @Published private(set) var starting = false
     private var startRetry: DispatchWorkItem?
-    @Published private(set) var audioAccess = SystemAudioPermission.Status.undetermined
+    @Published private(set) var audioAccess = AudioAccessState.unchecked
     private var wantsAudio = false
+    private var retryAfterActivation = false
     private var permissionGeneration = 0
     @Published var bypass = false
     @Published var autoGain = true
@@ -41,8 +42,7 @@ final class EQModel: ObservableObject {
     private(set) var statusLevels = [Double](repeating: 0, count: 5)
     var panelVisible = true
     private let engine: AudioEngineControlling
-    private let permissionStatus: () -> SystemAudioPermission.Status
-    private let requestPermission: (@escaping (SystemAudioPermission.Status) -> Void) -> Void
+    private let verifier: CaptureVerifying
     private let defaults: UserDefaults
     private let analyzer = SpectrumAnalyzer()
     private var timer: Timer?
@@ -54,13 +54,11 @@ final class EQModel: ObservableObject {
     let presets = ["Flat", "Warm", "Bass", "Vocal", "Soft"]
 
     init(engine: AudioEngineControlling = SystemAudioEngine(),
-         permissionStatus: @escaping () -> SystemAudioPermission.Status = SystemAudioPermission.status,
-         requestPermission: @escaping (@escaping (SystemAudioPermission.Status) -> Void) -> Void = SystemAudioPermission.requestAccess,
+         verifier: CaptureVerifying = CaptureVerifier(),
          defaults: UserDefaults = .standard,
          monitorSystem: Bool = true) {
         self.engine = engine
-        self.permissionStatus = permissionStatus
-        self.requestPermission = requestPermission
+        self.verifier = verifier
         self.defaults = defaults
         if let data = defaults.data(forKey: "bands-v2"),
            let saved = try? JSONDecoder().decode([EQBand].self, from: data), saved.count == 4,
@@ -94,12 +92,13 @@ final class EQModel: ObservableObject {
     }
 
     deinit {
+        verifier.cancel()
         timer?.invalidate()
         for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
     }
 
     func prepareForSleep() {
-        let shouldResume = running
+        let shouldResume = running || starting
         stop()
         resumeAfterSleep = shouldResume
     }
@@ -124,44 +123,21 @@ final class EQModel: ObservableObject {
     }
 
     func resumeAfterAudioSettings() {
-        let status = permissionStatus()
-        audioAccess = status
-        if running && status != .authorized {
-            stop()
-            wantsAudio = true
-        } else if status == .authorized && wantsAudio && !running && !starting {
-            start()
-        }
+        // Called on activation, never from the analysis loop: a failed check must
+        // not repeatedly play test tones while the user is listening.
+        if starting { retryAfterActivation = true }
+        else if wantsAudio && !running { start() }
     }
 
     func start() {
         guard !running, !starting else { return }
         error = nil
         wantsAudio = true
-        audioAccess = permissionStatus()
-        switch audioAccess {
-        case .authorized:
-            starting = true
-            attemptStart(retriesRemaining: 1)
-        case .undetermined:
-            starting = true
-            permissionGeneration += 1
-            let generation = permissionGeneration
-            requestPermission { [weak self] status in
-                guard let self, self.permissionGeneration == generation, self.wantsAudio else { return }
-                self.audioAccess = status
-                if status == .authorized {
-                    self.attemptStart(retriesRemaining: 1)
-                } else {
-                    self.starting = false
-                    if status == .unavailable { self.error = "Could not check system audio access." }
-                }
-            }
-        case .denied:
-            starting = false
-        case .unavailable:
-            error = "Could not check system audio access on this macOS version."
-        }
+        permissionGeneration += 1
+        retryAfterActivation = false
+        audioAccess = .checking
+        starting = true
+        attemptStart(retriesRemaining: 1)
     }
 
     private func attemptStart(retriesRemaining: Int) {
@@ -172,9 +148,30 @@ final class EQModel: ObservableObject {
             sampleRate = engine.sampleRate
             outputName = engine.outputName
             push()
-            started = Date()
-            running = true
-            starting = false
+            let generation = permissionGeneration
+            verifier.begin(dsp: engine.dsp, rate: sampleRate) { [weak self] verified in
+                guard let self, self.permissionGeneration == generation, self.starting else { return }
+                if verified {
+                    do {
+                        try self.engine.enableProcessing()
+                        self.audioAccess = .verified
+                        self.started = Date()
+                        self.running = true
+                        self.starting = false
+                    } catch {
+                        self.engine.stop()
+                        self.starting = false
+                        self.wantsAudio = false
+                        self.audioAccess = .failed
+                        self.error = error.localizedDescription
+                    }
+                } else {
+                    self.engine.stop()
+                    self.starting = false
+                    self.audioAccess = .needsHelp
+                    if self.retryAfterActivation { self.start() }
+                }
+            }
         } catch {
             // engine.start() has already cleaned up the failed route and tap.
             if let failure = error as? AudioFailure, failure.isTransient, retriesRemaining > 0 {
@@ -187,21 +184,24 @@ final class EQModel: ObservableObject {
                 return
             }
             self.error = error.localizedDescription
-            audioAccess = permissionStatus()
+            audioAccess = .failed
             running = false
             starting = false
             // Only permission changes resume automatically; other failures need an explicit retry.
-            wantsAudio = audioAccess != .authorized
+            wantsAudio = false
         }
     }
     func stop() {
         resumeAfterSleep = false
         wantsAudio = false
+        retryAfterActivation = false
         permissionGeneration += 1
         startRetry?.cancel()
         startRetry = nil
         starting = false
+        verifier.cancel()
         engine.stop()
+        audioAccess = .unchecked
         running = false
         peak = 0
         statusLevels = Array(repeating: 0, count: 5)
@@ -248,9 +248,6 @@ final class EQModel: ObservableObject {
             + abs(nextMotion.bass - gradientMotion.bass)
             + abs(nextMotion.balance - gradientMotion.balance) > 0.0001 {
             gradientMotion = nextMotion
-        }
-        if ticks % 30 == 0, running || wantsAudio {
-            resumeAfterAudioSettings()
         }
         guard running else { return }
         if ticks % 30 == 0, engine.routeChanged() {

@@ -153,12 +153,16 @@ struct EQGraph: View, Animatable {
             .allowsHitTesting(model.running)
             .overlay {
                 VStack(spacing: 12) {
-                    Text(model.audioAccess == .denied ? "System audio access is required." :
-                         (model.starting ? (model.audioAccess == .authorized ? "Starting equalizer…" : "Allow system audio access to enable toneboy.") :
+                    Text(model.starting ? "Checking audio access…" :
+                         (model.audioAccess == .needsHelp ? "Audio access could not be verified." :
                          (model.error == nil ? "Equalizer is bypassed" : "Couldn’t start audio. Try again.")))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.gray.opacity(0.7))
-                    if model.audioAccess == .denied || model.audioAccess == .unavailable {
+                    if model.audioAccess == .needsHelp {
+                        Text("Allow System Audio Recording in Settings, then return here.\nIf access is already enabled, check your output and retry.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                         Button("Open System Settings") { model.openAudioSettings() }
                             .font(.system(size: 11, weight: .medium))
                             .buttonStyle(.bordered)
