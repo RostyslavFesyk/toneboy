@@ -143,116 +143,7 @@ struct EQGraph: View, Animatable {
         GeometryReader { geometry in
             let size = geometry.size
             Canvas { context, _ in
-                let rect = plot(size)
-                context.opacity = min(1, max(0, activation))
-                let energy = reduceMotion ? 0.0 : min(1, max(0, model.peak))
-                let gridFrequencies: [Double] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
-                for frequency in gridFrequencies {
-                    let x = xPosition(frequency, rect)
-                    var line = Path(); line.move(to: CGPoint(x: x, y: rect.minY)); line.addLine(to: CGPoint(x: x, y: rect.maxY))
-                    context.stroke(line, with: .linearGradient(
-                        Gradient(stops: [.init(color: .clear, location: 0),
-                                         .init(color: .white.opacity(0.16), location: 0.28),
-                                         .init(color: .white.opacity(0.16), location: 1)]),
-                        startPoint: CGPoint(x: 0, y: rect.minY),
-                        endPoint: CGPoint(x: 0, y: rect.maxY)), lineWidth: 1)
-                    let label = frequency >= 1000 ? "\(Int(frequency/1000))k" : "\(Int(frequency))"
-                    if frequency > 20 && frequency < 20000 {
-                        context.draw(Text(label).font(.system(size: 9, design: .monospaced)).foregroundStyle(.white.opacity(0.85)), at: CGPoint(x: x, y: rect.maxY+17))
-                    }
-                }
-                // Input FFT in dBFS; its scale is separate from the +/-12 dB EQ axis.
-                let points = model.spectrum.enumerated().map { i, value in
-                    CGPoint(x: rect.minX + Double(i)/Double(model.spectrum.count-1)*rect.width,
-                            y: rect.maxY-max(0,min(1,(value+80)/80))*rect.height*0.88)
-                }
-                let spectrumRidge = smoothRidge(points)
-                var spectrum = spectrumRidge
-                spectrum.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-                spectrum.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-                spectrum.closeSubpath()
-                // Isolated compositing keeps blur off labels, handles, and the crisp curve.
-                if model.running, (model.spectrum.max() ?? -90) > -78 {
-                    context.drawLayer { spectrumLayer in
-                        spectrumLayer.clip(to: Path(rect))
-                        spectrumLayer.drawLayer { glow in
-                            glow.addFilter(.blur(radius: 8))
-                            glow.stroke(spectrumRidge, with: .color(.white.opacity(0.22)), lineWidth: 6)
-                        }
-                        spectrumLayer.fill(spectrum, with: .linearGradient(
-                            Gradient(stops: [.init(color: .white.opacity(0.12), location: 0),
-                                             .init(color: .white.opacity(0.05), location: 0.55),
-                                             .init(color: .clear, location: 1)]),
-                            startPoint: CGPoint(x: 0,y: rect.minY), endPoint: CGPoint(x: 0,y: rect.maxY)))
-                        spectrumLayer.stroke(spectrumRidge, with: .linearGradient(
-                            Gradient(stops: [.init(color: .clear, location: 0),
-                                             .init(color: .white.opacity(0.8), location: 0.25),
-                                             .init(color: .white.opacity(0.65), location: 0.8),
-                                             .init(color: .clear, location: 1)]),
-                            startPoint: CGPoint(x: 0,y: rect.minY), endPoint: CGPoint(x: 0,y: rect.maxY)), lineWidth: 1.4)
-                        // Fade the composited result, including blur, before it reaches the floor.
-                        spectrumLayer.blendMode = .destinationIn
-                        spectrumLayer.fill(Path(rect), with: .linearGradient(
-                            Gradient(stops: [.init(color: .white, location: 0),
-                                             .init(color: .white, location: 0.84),
-                                             .init(color: .clear, location: 1)]),
-                            startPoint: CGPoint(x: 0, y: rect.minY),
-                            endPoint: CGPoint(x: 0, y: rect.maxY)))
-                    }
-                }
-
-                let curve = responsePath(rect)
-                // Shade the actual combined response relative to unity, including cuts.
-                // A single continuous region keeps overlapping filters from hiding the net EQ.
-                var difference = curve
-                difference.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-                difference.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
-                difference.closeSubpath()
-                context.fill(difference, with: .linearGradient(
-                    Gradient(stops: [.init(color: .white.opacity(0.27), location: 0),
-                                     .init(color: .white.opacity(0.12), location: 0.5),
-                                     .init(color: .white.opacity(0.24), location: 1)]),
-                    startPoint: CGPoint(x: 0,y: rect.minY), endPoint: CGPoint(x: 0,y: rect.maxY)))
-                context.drawLayer { glow in
-                    glow.addFilter(.blur(radius: 10))
-                    glow.stroke(curve, with: .color(.white.opacity(0.22+energy*0.06)), lineWidth: 12)
-                }
-                context.drawLayer { glow in
-                    glow.addFilter(.blur(radius: 3))
-                    glow.stroke(curve, with: .color(.white.opacity(0.35)), lineWidth: 5)
-                }
-                context.stroke(curve, with: .color(.white), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                for band in model.bands {
-                    let point = CGPoint(x: xPosition(band.frequency, rect), y: yPosition(band.graphGain, rect))
-                    let circle = Path(ellipseIn: CGRect(x: point.x-10, y: point.y-10, width: 20, height: 20))
-                    context.fill(circle, with: .color(.white))
-                    context.fill(circle, with: .color(palette.center.opacity(min(1, max(0, activation)))))
-                    context.stroke(circle, with: .color(.white),
-                                   lineWidth: 2.5)
-                    if model.running && draggedBand == band.id {
-                        let labelX = min(rect.maxX-36, max(rect.minX+36, point.x))
-                        let labelY = point.y < rect.minY+35 ? point.y+30 : point.y-29
-                        let labelRect = CGRect(x: labelX-32, y: labelY-11, width: 64, height: 22)
-                        context.fill(Path(roundedRect: labelRect, cornerRadius: 11), with: .color(ink.opacity(0.94)))
-                        let number = context.resolve(Text(String(format: "%+.1f", band.gain))
-                            .font(.system(size: 11, weight: .medium)).monospacedDigit()
-                            .foregroundStyle(.primary))
-                        let unit = context.resolve(Text("dB")
-                            .font(.system(size: 11, weight: .medium)).foregroundStyle(.primary))
-                        let maxNumber = context.resolve(Text("+18.0")
-                            .font(.system(size: 11, weight: .medium)).monospacedDigit())
-                        let proposal = CGSize(width: 100, height: 22)
-                        let numberWidth = maxNumber.measure(in: proposal).width
-                        let unitWidth = unit.measure(in: proposal).width
-                        let gap = 4.0
-                        let left = labelX - (numberWidth + gap + unitWidth) / 2
-                        // Center the number in a fixed slot; the unit never shifts with its value.
-                        context.draw(number, at: CGPoint(x: left + numberWidth / 2, y: labelY))
-                        context.draw(unit, at: CGPoint(x: left + numberWidth + gap, y: labelY), anchor: .leading)
-                    }
-                }
-
-
+                drawGraph(context: &context, size: size)
             }
             .background(ScrollCapture { delta in
                 guard model.running else { return }
@@ -310,6 +201,118 @@ struct EQGraph: View, Animatable {
         }
 
     }
+    // Keep drawing out of the ViewBuilder so older Swift compilers can type-check it.
+    private func drawGraph(context: inout GraphicsContext, size: CGSize) {
+        let rect = plot(size)
+        context.opacity = min(1, max(0, activation))
+        let energy = reduceMotion ? 0.0 : min(1, max(0, model.peak))
+        let gridFrequencies: [Double] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+        for frequency in gridFrequencies {
+            let x = xPosition(frequency, rect)
+            var line = Path(); line.move(to: CGPoint(x: x, y: rect.minY)); line.addLine(to: CGPoint(x: x, y: rect.maxY))
+            context.stroke(line, with: .linearGradient(
+                Gradient(stops: [.init(color: .clear, location: 0),
+                                 .init(color: .white.opacity(0.16), location: 0.28),
+                                 .init(color: .white.opacity(0.16), location: 1)]),
+                startPoint: CGPoint(x: 0, y: rect.minY),
+                endPoint: CGPoint(x: 0, y: rect.maxY)), lineWidth: 1)
+            let label = frequency >= 1000 ? "\(Int(frequency/1000))k" : "\(Int(frequency))"
+            if frequency > 20 && frequency < 20000 {
+                context.draw(Text(label).font(.system(size: 9, design: .monospaced)).foregroundStyle(.white.opacity(0.85)), at: CGPoint(x: x, y: rect.maxY+17))
+            }
+        }
+        // Input FFT in dBFS; its scale is separate from the +/-12 dB EQ axis.
+        let points = model.spectrum.enumerated().map { i, value in
+            CGPoint(x: rect.minX + Double(i)/Double(model.spectrum.count-1)*rect.width,
+                    y: rect.maxY-max(0,min(1,(value+80)/80))*rect.height*0.88)
+        }
+        let spectrumRidge = smoothRidge(points)
+        var spectrum = spectrumRidge
+        spectrum.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        spectrum.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        spectrum.closeSubpath()
+        // Isolated compositing keeps blur off labels, handles, and the crisp curve.
+        if model.running, (model.spectrum.max() ?? -90) > -78 {
+            context.drawLayer { spectrumLayer in
+                spectrumLayer.clip(to: Path(rect))
+                spectrumLayer.drawLayer { glow in
+                    glow.addFilter(.blur(radius: 8))
+                    glow.stroke(spectrumRidge, with: .color(.white.opacity(0.22)), lineWidth: 6)
+                }
+                spectrumLayer.fill(spectrum, with: .linearGradient(
+                    Gradient(stops: [.init(color: .white.opacity(0.12), location: 0),
+                                     .init(color: .white.opacity(0.05), location: 0.55),
+                                     .init(color: .clear, location: 1)]),
+                    startPoint: CGPoint(x: 0,y: rect.minY), endPoint: CGPoint(x: 0,y: rect.maxY)))
+                spectrumLayer.stroke(spectrumRidge, with: .linearGradient(
+                    Gradient(stops: [.init(color: .clear, location: 0),
+                                     .init(color: .white.opacity(0.8), location: 0.25),
+                                     .init(color: .white.opacity(0.65), location: 0.8),
+                                     .init(color: .clear, location: 1)]),
+                    startPoint: CGPoint(x: 0,y: rect.minY), endPoint: CGPoint(x: 0,y: rect.maxY)), lineWidth: 1.4)
+                // Fade the composited result, including blur, before it reaches the floor.
+                spectrumLayer.blendMode = .destinationIn
+                spectrumLayer.fill(Path(rect), with: .linearGradient(
+                    Gradient(stops: [.init(color: .white, location: 0),
+                                     .init(color: .white, location: 0.84),
+                                     .init(color: .clear, location: 1)]),
+                    startPoint: CGPoint(x: 0, y: rect.minY),
+                    endPoint: CGPoint(x: 0, y: rect.maxY)))
+            }
+        }
+
+        let curve = responsePath(rect)
+        // Shade the actual combined response relative to unity, including cuts.
+        // A single continuous region keeps overlapping filters from hiding the net EQ.
+        var difference = curve
+        difference.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        difference.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        difference.closeSubpath()
+        context.fill(difference, with: .linearGradient(
+            Gradient(stops: [.init(color: .white.opacity(0.27), location: 0),
+                             .init(color: .white.opacity(0.12), location: 0.5),
+                             .init(color: .white.opacity(0.24), location: 1)]),
+            startPoint: CGPoint(x: 0,y: rect.minY), endPoint: CGPoint(x: 0,y: rect.maxY)))
+        context.drawLayer { glow in
+            glow.addFilter(.blur(radius: 10))
+            glow.stroke(curve, with: .color(.white.opacity(0.22+energy*0.06)), lineWidth: 12)
+        }
+        context.drawLayer { glow in
+            glow.addFilter(.blur(radius: 3))
+            glow.stroke(curve, with: .color(.white.opacity(0.35)), lineWidth: 5)
+        }
+        context.stroke(curve, with: .color(.white), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+        for band in model.bands {
+            let point = CGPoint(x: xPosition(band.frequency, rect), y: yPosition(band.graphGain, rect))
+            let circle = Path(ellipseIn: CGRect(x: point.x-10, y: point.y-10, width: 20, height: 20))
+            context.fill(circle, with: .color(.white))
+            context.fill(circle, with: .color(palette.center.opacity(min(1, max(0, activation)))))
+            context.stroke(circle, with: .color(.white),
+                           lineWidth: 2.5)
+            if model.running && draggedBand == band.id {
+                let labelX = min(rect.maxX-36, max(rect.minX+36, point.x))
+                let labelY = point.y < rect.minY+35 ? point.y+30 : point.y-29
+                let labelRect = CGRect(x: labelX-32, y: labelY-11, width: 64, height: 22)
+                context.fill(Path(roundedRect: labelRect, cornerRadius: 11), with: .color(ink.opacity(0.94)))
+                let number = context.resolve(Text(String(format: "%+.1f", band.gain))
+                    .font(.system(size: 11, weight: .medium)).monospacedDigit()
+                    .foregroundStyle(.primary))
+                let unit = context.resolve(Text("dB")
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.primary))
+                let maxNumber = context.resolve(Text("+18.0")
+                    .font(.system(size: 11, weight: .medium)).monospacedDigit())
+                let proposal = CGSize(width: 100, height: 22)
+                let numberWidth = maxNumber.measure(in: proposal).width
+                let unitWidth = unit.measure(in: proposal).width
+                let gap = 4.0
+                let left = labelX - (numberWidth + gap + unitWidth) / 2
+                // Center the number in a fixed slot; the unit never shifts with its value.
+                context.draw(number, at: CGPoint(x: left + numberWidth / 2, y: labelY))
+                context.draw(unit, at: CGPoint(x: left + numberWidth + gap, y: labelY), anchor: .leading)
+            }
+        }
+    }
+
     private func smoothRidge(_ points: [CGPoint]) -> Path {
         Path { path in
             guard let first = points.first, let last = points.last else { return }
