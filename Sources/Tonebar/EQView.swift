@@ -146,7 +146,8 @@ struct EQGraph: View, Animatable {
                 let rect = plot(size)
                 context.opacity = min(1, max(0, activation))
                 let energy = reduceMotion ? 0.0 : min(1, max(0, model.peak))
-                for frequency in [20.0,50,100,200,500,1000,2000,5000,10000,20000] {
+                let gridFrequencies: [Double] = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+                for frequency in gridFrequencies {
                     let x = xPosition(frequency, rect)
                     var line = Path(); line.move(to: CGPoint(x: x, y: rect.minY)); line.addLine(to: CGPoint(x: x, y: rect.maxY))
                     context.stroke(line, with: .linearGradient(
