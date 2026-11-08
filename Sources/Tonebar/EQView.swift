@@ -192,7 +192,7 @@ struct EQGraph: View, Animatable {
                     draggedBand = nearest.id; model.selected = nearest.id
                 }
                 guard let index = draggedBand else { return }
-                let x = min(1,max(0,(value.location.x-rect.minX)/rect.width))
+                let x = min(1.0, max(0.0, Double((value.location.x-rect.minX)/rect.width)))
                 let gain = displayGainRange-(value.location.y-rect.minY)/rect.height*(2*displayGainRange)
                 model.changeBand(index, frequency: 20*pow(1000,x), gain: gain * (model.bands[index].isShelf ? 2 : 1))
             }.onEnded { _ in draggedBand = nil }, including: model.running ? .all : .subviews)
