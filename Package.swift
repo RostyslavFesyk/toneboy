@@ -5,7 +5,9 @@ let package = Package(
     name: "toneboy",
     platforms: [.macOS("14.2")],
     products: [.executable(name: "toneboy", targets: ["Tonebar"]),
-               .executable(name: "toneboy-sandbox-probe", targets: ["SandboxProbe"])],
+               .executable(name: "toneboy-sandbox-probe", targets: ["SandboxProbe"]),
+               .library(name: "AudioDSP", targets: ["AudioDSP"]),
+               .library(name: "CaptureVerification", targets: ["CaptureVerification"])],
     targets: [
         .target(name: "AudioDSP", publicHeadersPath: "include",
                 linkerSettings: [.linkedFramework("CoreAudio")]),

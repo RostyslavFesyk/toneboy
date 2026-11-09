@@ -1,0 +1,96 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3BB780A36E190DBC2FBB94CF /* AudioDSP framework */ = {isa = PBXBuildFile; productRef = 9456481114BA610FBB186E2C;};
+		2AABC677F8AA7C4EC1625B46 /* CaptureVerification framework */ = {isa = PBXBuildFile; productRef = B1FF35E7E59121087BCC8D5B;};
+		95BEFC12C57E679C159F233F /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF0719EF2FCE65A7F30688B;};
+		8867A868B2152F9980594CDB /* AudioFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A5E03C9521DC41B607F140;};
+		35177FD6314BBB02F706F27B /* CaptureVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4653D383AA1191477FB5B4CB;};
+		7AFA7FDEEF1F8CA0E8116232 /* EQModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC44A7724D68C2EF417C7BAE;};
+		E386E6FA6DA136CCCDF8E90E /* EQView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE16946BF4E2F9309DED95B;};
+		89FABDA6B87E769C85467311 /* Gradients.swift in Sources */ = {isa = PBXBuildFile; fileRef = F021A04A89CE78C7524E0F59;};
+		E779FDA8BA2A7839EECB9CFA /* LoginItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6BF34DE58A75393D0FEF5CC;};
+		59268D6539A88C54845BFADF /* SingleInstance.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9FD4E6DD1B48D194C42218;};
+		821817A095C9FB5E397A7AF1 /* Spectrum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FC45D527C6DB9D13D512DD4;};
+		BD1813D0AB7B6A6FB7B8FCBA /* StatusAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47644DB80039891E1D734985;};
+		3B65BC4796CBD292536455AF /* TonebarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BDE3B129625AF56B284C40E;};
+		C261771CE66B9A0EDEE77010 /* ToneboyLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F2420CA3D244018AFCDBBB;};
+		9621E04385F97CB6CC38083C /* Store assets */ = {isa = PBXBuildFile; fileRef = 2E655AD105B8982E58597990;};
+		DA14261412EDDE29A001C9F5 /* Privacy manifest */ = {isa = PBXBuildFile; fileRef = 633AA8F69B5D367C111DA9BC;};
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		DDF0719EF2FCE65A7F30688B /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioEngine.swift"; sourceTree = "<group>";};
+		D2A5E03C9521DC41B607F140 /* AudioFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AudioFailure.swift"; sourceTree = "<group>";};
+		4653D383AA1191477FB5B4CB /* CaptureVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CaptureVerifier.swift"; sourceTree = "<group>";};
+		DC44A7724D68C2EF417C7BAE /* EQModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EQModel.swift"; sourceTree = "<group>";};
+		3EE16946BF4E2F9309DED95B /* EQView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EQView.swift"; sourceTree = "<group>";};
+		F021A04A89CE78C7524E0F59 /* Gradients.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Gradients.swift"; sourceTree = "<group>";};
+		A6BF34DE58A75393D0FEF5CC /* LoginItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LoginItem.swift"; sourceTree = "<group>";};
+		ED9FD4E6DD1B48D194C42218 /* SingleInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SingleInstance.swift"; sourceTree = "<group>";};
+		1FC45D527C6DB9D13D512DD4 /* Spectrum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Spectrum.swift"; sourceTree = "<group>";};
+		47644DB80039891E1D734985 /* StatusAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "StatusAnimation.swift"; sourceTree = "<group>";};
+		4BDE3B129625AF56B284C40E /* TonebarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TonebarApp.swift"; sourceTree = "<group>";};
+		A0F2420CA3D244018AFCDBBB /* ToneboyLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ToneboyLogo.swift"; sourceTree = "<group>";};
+		2E655AD105B8982E58597990 /* StoreAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "StoreAssets.xcassets"; sourceTree = "<group>";};
+		633AA8F69B5D367C111DA9BC /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = "Resources/PrivacyInfo.xcprivacy"; sourceTree = "<group>";};
+		6733EF3EF8D40270FA35435D /* AppStore.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Configuration/AppStore.xcconfig"; sourceTree = "<group>";};
+		F654EEE87C31943AF814FE34 /* AppStore-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Configuration/AppStore-Info.plist"; sourceTree = "<group>";};
+		A134845101D8E77E0C38F5A4 /* AppStore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Configuration/AppStore.entitlements"; sourceTree = "<group>";};
+		8F2D850B506AC4FB68286DEB /* toneboy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = toneboy.app; sourceTree = BUILT_PRODUCTS_DIR;};
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5BBF709907691E4BAB092CE6 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (3BB780A36E190DBC2FBB94CF, 2AABC677F8AA7C4EC1625B46,); runOnlyForDeploymentPostprocessing = 0;};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		561CC2A187876221C8EC43ED /* Tonebar sources */ = {isa = PBXGroup; children = (DDF0719EF2FCE65A7F30688B, D2A5E03C9521DC41B607F140, 4653D383AA1191477FB5B4CB, DC44A7724D68C2EF417C7BAE, 3EE16946BF4E2F9309DED95B, F021A04A89CE78C7524E0F59, A6BF34DE58A75393D0FEF5CC, ED9FD4E6DD1B48D194C42218, 1FC45D527C6DB9D13D512DD4, 47644DB80039891E1D734985, 4BDE3B129625AF56B284C40E, A0F2420CA3D244018AFCDBBB,); name = Sources; path = Sources/Tonebar; sourceTree = "<group>";};
+		811CAC3977B4D94153AD9CCB /* Products */ = {isa = PBXGroup; children = (8F2D850B506AC4FB68286DEB,); name = Products; sourceTree = "<group>";};
+		02ED4CB73CB6C1E9C53F3B80 /* Main group */ = {isa = PBXGroup; children = (561CC2A187876221C8EC43ED, 2E655AD105B8982E58597990, 633AA8F69B5D367C111DA9BC, 6733EF3EF8D40270FA35435D, F654EEE87C31943AF814FE34, A134845101D8E77E0C38F5A4, 811CAC3977B4D94153AD9CCB,); sourceTree = "<group>";};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4E55C772B1C7083408BC6943 /* toneboy */ = {isa = PBXNativeTarget; buildConfigurationList = D5B07846FA3D36832123F09C; buildPhases = (BB9DE80C71C484B2BB41EC78, 5BBF709907691E4BAB092CE6, 83299C9F5F1E86B2A4D24A6D,); buildRules = (); dependencies = (); name = toneboy; packageProductDependencies = (9456481114BA610FBB186E2C, B1FF35E7E59121087BCC8D5B,); productName = toneboy; productReference = 8F2D850B506AC4FB68286DEB; productType = "com.apple.product-type.application";};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0EC051E907730E4B98C615A1 /* Project object */ = {isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2650; }; buildConfigurationList = 0013112C9837C6B4DF5B4EA8; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = 02ED4CB73CB6C1E9C53F3B80; packageReferences = (B9F44FC5BFC0373F2CF29491,); productRefGroup = 811CAC3977B4D94153AD9CCB; projectDirPath = ""; projectRoot = ""; targets = (4E55C772B1C7083408BC6943,);};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		83299C9F5F1E86B2A4D24A6D /* Copy Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (9621E04385F97CB6CC38083C, DA14261412EDDE29A001C9F5,); runOnlyForDeploymentPostprocessing = 0;};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BB9DE80C71C484B2BB41EC78 /* Compile Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (95BEFC12C57E679C159F233F, 8867A868B2152F9980594CDB, 35177FD6314BBB02F706F27B, 7AFA7FDEEF1F8CA0E8116232, E386E6FA6DA136CCCDF8E90E, 89FABDA6B87E769C85467311, E779FDA8BA2A7839EECB9CFA, 59268D6539A88C54845BFADF, 821817A095C9FB5E397A7AF1, BD1813D0AB7B6A6FB7B8FCBA, 3B65BC4796CBD292536455AF, C261771CE66B9A0EDEE77010,); runOnlyForDeploymentPostprocessing = 0;};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		D9D8FC47AE0D59B51D2212CE /* Debug target */ = {isa = XCBuildConfiguration; baseConfigurationReference = 6733EF3EF8D40270FA35435D; buildSettings = {}; name = Debug;};
+		BFDB2D44EE32DB2F2EC47D60 /* Debug project */ = {isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SDKROOT = macosx; DEBUG_INFORMATION_FORMAT = dwarf; ONLY_ACTIVE_ARCH = YES; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug;};
+		86118A09BB1B242886569E06 /* Release target */ = {isa = XCBuildConfiguration; baseConfigurationReference = 6733EF3EF8D40270FA35435D; buildSettings = {}; name = Release;};
+		E2AC59A3343EBB2759FF9974 /* Release project */ = {isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; SDKROOT = macosx; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; SWIFT_COMPILATION_MODE = wholemodule; }; name = Release;};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D5B07846FA3D36832123F09C /* Target configurations */ = {isa = XCConfigurationList; buildConfigurations = (D9D8FC47AE0D59B51D2212CE, 86118A09BB1B242886569E06,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		0013112C9837C6B4DF5B4EA8 /* Project configurations */ = {isa = XCConfigurationList; buildConfigurations = (BFDB2D44EE32DB2F2EC47D60, E2AC59A3343EBB2759FF9974,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B9F44FC5BFC0373F2CF29491 /* Local toneboy package */ = {isa = XCLocalSwiftPackageReference; relativePath = ".";};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9456481114BA610FBB186E2C /* AudioDSP */ = {isa = XCSwiftPackageProductDependency; package = B9F44FC5BFC0373F2CF29491; productName = AudioDSP;};
+		B1FF35E7E59121087BCC8D5B /* CaptureVerification */ = {isa = XCSwiftPackageProductDependency; package = B9F44FC5BFC0373F2CF29491; productName = CaptureVerification;};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0EC051E907730E4B98C615A1 /* Project object */;
+}

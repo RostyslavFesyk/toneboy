@@ -41,6 +41,9 @@ struct EQView: View {
                     Toggle("Auto Headroom", isOn: Binding(get: { model.autoGain }, set: { model.autoGain = $0; model.push() }))
                     Divider()
                     Button("Reset EQ") { model.applyPreset("Flat") }
+                    #if APP_STORE
+                    Link("Privacy Policy", destination: URL(string: "https://github.com/RostyslavFesyk/toneboy/blob/main/docs/PRIVACY.md")!)
+                    #endif
                     Button("Quit") { model.stop(); NSApplication.shared.terminate(nil) }
                 } label: { Image(systemName: "ellipsis").frame(width: 16) }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
