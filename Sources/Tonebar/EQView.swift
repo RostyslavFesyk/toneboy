@@ -16,10 +16,8 @@ struct EQView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 HStack(spacing: 7) {
-                    Image(systemName: "waveform").font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(LinearGradient(
-                            colors: [palette.current.halo, palette.current.center, palette.current.bottom],
-                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                    ToneboyLogo(palette: palette.current)
+                        .frame(width: 25, height: 25)
                     Text("toneboy").font(.system(size: 14, weight: .semibold, design: .rounded))
                 }
                 Spacer(minLength: 10)

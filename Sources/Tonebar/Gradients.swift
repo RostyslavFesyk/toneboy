@@ -30,6 +30,21 @@ enum GradientPalette: String, CaseIterable {
         case .forest:return Color(red:0.57,green:0.92,blue:0.70)
         }
     }
+
+    // Draw in AppKit coordinates with the colored core just below the image.
+    func drawStatusGradient(in context: CGContext, size: CGSize) {
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.scaleBy(x: size.width, y: size.height)
+        let colors = [bottom, bottom, center, halo].map {
+            NSColor($0).usingColorSpace(.deviceRGB)!.cgColor
+        }
+        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                  colors: colors as CFArray, locations: [0, 0.13, 0.52, 1])!
+        let core = CGPoint(x: 0.5, y: -0.12)
+        context.drawRadialGradient(gradient, startCenter: core, startRadius: 0,
+                                   endCenter: core, endRadius: 1.35, options: [.drawsAfterEndLocation])
+    }
 }
 final class GradientStore: ObservableObject {
     @Published private(set) var current: GradientPalette

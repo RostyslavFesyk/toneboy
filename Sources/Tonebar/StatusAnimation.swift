@@ -45,18 +45,7 @@ final class StatusAnimation {
         let image = NSImage(size: NSSize(width: 32, height: 20), flipped: false) { rect in
             NSBezierPath(roundedRect: rect, xRadius: 10, yRadius: 10).addClip()
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
-            context.saveGState()
-            context.scaleBy(x: 32, y: 20)
-            // Use the app's colored core and halo, without its white header wash.
-            let colors = [palette.bottom, palette.bottom, palette.center, palette.halo].map {
-                NSColor($0).usingColorSpace(.deviceRGB)!.cgColor
-            }
-            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                      colors: colors as CFArray, locations: [0, 0.13, 0.52, 1])!
-            context.drawRadialGradient(gradient, startCenter: CGPoint(x: 0.5, y: -0.12),
-                                       startRadius: 0, endCenter: CGPoint(x: 0.5, y: -0.12),
-                                       endRadius: 1.35, options: [.drawsAfterEndLocation])
-            context.restoreGState()
+            palette.drawStatusGradient(in: context, size: rect.size)
             return true
         }
         backgrounds[palette] = image
